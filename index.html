@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>طرح‌های لابی</title>
+<meta name="theme-color" content="#14161a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lobby AR">
+<script>self.ModelViewerElement = self.ModelViewerElement || {}; self.ModelViewerElement.dracoDecoderLocation = new URL("draco/", location.href).href;</script>
+<script src="model-viewer-umd.min.js"></script>
+<script>customElements.whenDefined("model-viewer").then(function(C){ C.dracoDecoderLocation = new URL("draco/", location.href).href; });</script>
+<style>
+@font-face{font-family:"Vazirmatn";font-weight:400;font-display:swap;src:url(Vazirmatn-Regular.woff2) format("woff2")}
+@font-face{font-family:"Vazirmatn";font-weight:600;font-display:swap;src:url(Vazirmatn-SemiBold.woff2) format("woff2")}
+@font-face{font-family:"Vazirmatn";font-weight:800;font-display:swap;src:url(Vazirmatn-ExtraBold.woff2) format("woff2")}
+  :root {
+    --ink: #14161a;
+    --glass: rgba(20, 22, 26, .62);
+    --line: rgba(255, 255, 255, .18);
+    --text: #f4f3ef;
+    --muted: #b9bcc2;
+    --accent: #c9d6a3;
+    --accent-ink: #1c2210;
+    box-sizing: border-box;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; background: var(--ink); color: var(--text);
+    font-family: "Vazirmatn", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+    overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+  /* ---------- لایه‌ها: دوربین زنده، طرح شفاف، رابط ---------- */
+  #stage { position: fixed; inset: 0; touch-action: pan-y; user-select: none; }
+  #cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #23262c; }
+  #fallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    padding: 2rem; text-align: center; color: var(--muted); line-height: 1.9;
+    background: radial-gradient(120% 90% at 50% 20%, #2b2f36, #14161a); }
+  #overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+    pointer-events: none; opacity: 1; transition: opacity .28s ease, transform .28s ease; }
+  #overlay.out-next { opacity: 0; transform: translateX(-5%); }
+  #overlay.out-prev { opacity: 0; transform: translateX(5%); }
+
+  /* ---------- نوار بالا ---------- */
+  .top { position: fixed; top: 0; inset-inline: 0; padding: calc(env(safe-area-inset-top, 0px) + .9rem) 1rem .9rem;
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+    background: linear-gradient(to bottom, rgba(0,0,0,.55), transparent); pointer-events: none; }
+  .top h1 { margin: 0; font-size: 1.05rem; font-weight: 800; }
+  .top .count { font-size: .85rem; color: var(--muted); }
+
+  /* ---------- نوار پایین ---------- */
+  .bottom { position: fixed; bottom: 0; inset-inline: 0;
+    padding: 1rem 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem);
+    background: linear-gradient(to top, rgba(0,0,0,.7), transparent); }
+  .name { text-align: center; font-weight: 600; font-size: 1.1rem; margin-bottom: .2rem; }
+  .desc { text-align: center; color: var(--muted); font-size: .85rem; line-height: 1.7; margin-bottom: .8rem; min-height: 3.4em; }
+  .dots { display: flex; justify-content: center; gap: .5rem; margin-bottom: .9rem; }
+  .dots button { width: .55rem; height: .55rem; padding: 0; border-radius: 50%; border: 0;
+    background: rgba(255,255,255,.35); transition: width .2s, background .2s; }
+  .dots button[aria-current="true"] { width: 1.6rem; border-radius: .3rem; background: var(--accent); }
+  .row { display: flex; gap: .6rem; align-items: stretch; }
+  .nav { flex: 0 0 3.2rem; border: 1px solid var(--line); background: var(--glass); color: var(--text);
+    border-radius: .9rem; font-size: 1.3rem; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .primary { flex: 1; border: 0; border-radius: .9rem; padding: .95rem 1rem; font: inherit; font-weight: 800;
+    font-size: 1rem; background: var(--accent); color: var(--accent-ink); }
+  button:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  button:active { transform: scale(.98); }
+  .hint { text-align: center; color: var(--muted); font-size: .75rem; margin-top: .6rem; }
+
+  /* ---------- پنل سه‌بعدی ---------- */
+  #sheet { position: fixed; inset: 0; background: var(--ink); display: none; flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px); }
+  #sheet.open { display: flex; animation: rise .28s ease; }
+  @keyframes rise { from { transform: translateY(6%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1rem; }
+  .sheet-head h2 { margin: 0; font-size: 1.05rem; }
+  .close { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: .7rem;
+    padding: .45rem .9rem; font: inherit; }
+  model-viewer { flex: 1; width: 100%; min-height: 0; --poster-color: transparent; background: #1b1e23; }
+  .progress { position: absolute; top: 4.2rem; inset-inline: 0; height: 3px; background: transparent; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .sheet-foot { padding: .9rem 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem); display: grid; gap: .6rem; }
+  .ar { display: block; text-align: center; text-decoration: none; padding: .95rem 1rem; border-radius: .9rem;
+    font-weight: 800; background: var(--accent); color: var(--accent-ink); position: relative; }
+  .ar.alt { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .ar img { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .note { margin: 0; text-align: center; color: var(--muted); font-size: .78rem; line-height: 1.8; }
+
+  .top .right { display:flex; align-items:center; gap:.6rem; pointer-events:auto; }
+  .pill { font-size:.72rem; color:var(--accent); border:1px solid var(--line); border-radius:999px; padding:.15rem .6rem; display:none; background:var(--glass); }
+  .pill.ok { display:inline-block; }
+  #inst { font:inherit; font-size:.78rem; font-weight:600; color:var(--accent-ink); background:var(--accent); border:0; border-radius:999px; padding:.3rem .8rem; }
+  #no3d { flex:1; display:none; align-items:center; justify-content:center; padding:2rem; text-align:center; color:var(--muted); line-height:2; background:#1b1e23; }
+  model-viewer[hidden], .sheet-foot[hidden] { display: none !important; }
+  #no3d.show { display:flex; }
+  .ar[hidden] { display:none; }
+  @media (prefers-reduced-motion: reduce) {
+    #overlay, #sheet.open, .dots button { transition: none; animation: none; }
+  }
+  @media (min-width: 700px) {
+    .bottom, .top { max-width: 520px; margin-inline: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- دوربین زنده + طرح شفاف -->
+<div id="stage">
+  <video id="cam" autoplay playsinline muted></video>
+  <div id="fallback">دسترسی به دوربین داده نشد.<br>اجازه‌ی دوربین را در تنظیمات مرورگر فعال کنید و صفحه را دوباره باز کنید.</div>
+  <img id="overlay" alt="">
+</div>
+
+<header class="top">
+  <h1>طرح‌های لابی</h1>
+  <span class="right"><span class="pill" id="pill"></span><button id="inst" hidden>نصب برنامه</button><span class="count" id="count"></span></span>
+</header>
+
+<section class="bottom">
+  <div class="name" id="name"></div>
+  <div class="desc" id="desc"></div>
+  <div class="dots" id="dots" role="tablist" aria-label="طرح‌ها"></div>
+  <div class="row">
+    <button class="nav" id="next" aria-label="طرح بعدی">›</button>
+    <button class="primary" id="open3d">این طرح را در سه‌بعدی ببین</button>
+    <button class="nav" id="prev" aria-label="طرح قبلی">‹</button>
+  </div>
+  <div class="hint">برای تعویض طرح، صفحه را به چپ یا راست بکشید</div>
+</section>
+
+<!-- پنل سه‌بعدی -->
+<section id="sheet" aria-hidden="true">
+  <div class="sheet-head">
+    <h2 id="sheetTitle"></h2>
+    <button class="close" id="closeSheet">بازگشت به طرح‌ها</button>
+  </div>
+  <div class="progress"><i id="bar"></i></div>
+  <model-viewer id="mv" ar ar-scale="fixed" camera-controls touch-action="pan-y" shadow-intensity="0.8"
+                environment-image="neutral" interaction-prompt="auto" alt="مدل سه‌بعدی طرح لابی"></model-viewer>
+  <div id="no3d">مدل سه‌بعدی این طرح هنوز آماده نشده است.<br>برای دیدن سه‌بعدی، طرح دیگری را انتخاب کنید.</div>
+  <div class="sheet-foot" id="sheetFoot">
+    <a class="ar" id="arAndroid" href="#">دیدن در فضا (اندروید)</a>
+    <a class="ar alt" id="arIOS" rel="ar" href="#">
+      <img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+      دیدن در فضا (آیفون)
+    </a>
+    <p class="note" id="arNote">در حالت فضا، لابی با اندازه‌ی واقعی نمایش داده می‌شود. بعد از باز شدن دوربین، گوشی را ۵ تا ۱۰ ثانیه آرام روی کف حرکت دهید تا سطح شناسایی شود.</p>
+  </div>
+</section>
+
+<script>
+/* ============ تنظیمات: فقط همین بخش را ویرایش کنید ============ */
+const DESIGNS = [
+  { name: "طرح اول", desc: "پیشخوان شیاردار بژ با رویه‌ی مرمر و پایه‌ی برنجی، دیوار گل‌وبوته‌ی طلایی و تابلوی گرد", png: "01.png", glb: null, usdz: null },
+  { name: "طرح دوم", desc: "پیشخوان سنگ مشکی با رگه‌های طلایی، دیوار قاب‌بندی‌شده‌ی خاکی و تابلوی منظره با چراغ‌های دیواری", png: "02.png", glb: null, usdz: null },
+  { name: "طرح سوم", desc: "رویه‌ی مرمر سفید با خطوط هندسی برنجی، لوگوی برنجی مجتمع و دیوار شکوفه‌دار با قاب‌های طلایی", png: "03.png", glb: "03.glb", usdz: "03.usdz" },
+  { name: "طرح چهارم", desc: "پیشخوان شیاردار چوبی، تابلوی گرد انتزاعی و پنل‌های چوبی کناری با چراغ‌های خطی", png: "04.png", glb: null, usdz: null }
+];
+/* ================================================================ */
+
+const $ = id => document.getElementById(id);
+const cam = $("cam"), overlay = $("overlay"), sheet = $("sheet"), mv = $("mv");
+let index = 0, stream = null, busy = false;
+
+const abs = p => new URL(p, location.href).href;
+const faDigits = n => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+
+/* ---------- دوربین ---------- */
+async function startCam() {
+  if (stream) return;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }, audio: false });
+    cam.srcObject = stream;
+    $("fallback").style.display = "none";
+  } catch (e) {
+    $("fallback").style.display = "flex";
+  }
+}
+function stopCam() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; cam.srcObject = null; }
+}
+
+/* ---------- نمایش طرح‌ها ---------- */
+function render() {
+  const d = DESIGNS[index];
+  overlay.src = d.png;
+  $("name").textContent = d.name;
+  $("desc").textContent = d.desc;
+  $("count").textContent = faDigits(index + 1) + " از " + faDigits(DESIGNS.length);
+  document.querySelectorAll("#dots button").forEach((b, i) =>
+    b.setAttribute("aria-current", i === index ? "true" : "false"));
+}
+function go(dir) {            // dir: +1 بعدی، -1 قبلی
+  if (busy) return; busy = true;
+  overlay.classList.add(dir > 0 ? "out-next" : "out-prev");
+  setTimeout(() => {
+    index = (index + dir + DESIGNS.length) % DESIGNS.length;
+    render();
+    overlay.classList.remove("out-next", "out-prev");
+    busy = false;
+  }, 260);
+}
+DESIGNS.forEach((d, i) => {
+  const b = document.createElement("button");
+  b.setAttribute("aria-label", d.name);
+  b.onclick = () => { index = i; render(); };
+  $("dots").appendChild(b);
+  new Image().src = d.png;     // پیش‌بارگذاری
+});
+
+/* ---------- سوایپ ---------- */
+let sx = null, sy = null;
+const stage = $("stage");
+stage.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; });
+stage.addEventListener("pointerup", e => {
+  if (sx === null) return;
+  const dx = e.clientX - sx, dy = e.clientY - sy; sx = sy = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) go(dx < 0 ? 1 : -1);
+});
+$("next").onclick = () => go(1);
+$("prev").onclick = () => go(-1);
+document.addEventListener("keydown", e => {
+  if (sheet.classList.contains("open")) { if (e.key === "Escape") closeSheet(); return; }
+  if (e.key === "ArrowLeft") go(1);
+  if (e.key === "ArrowRight") go(-1);
+});
+
+/* ---------- پنل سه‌بعدی و AR ---------- */
+const UA = navigator.userAgent;
+const isAndroid = /Android/i.test(UA);
+const isIOS = /iPhone|iPad|iPod/i.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let xrOK = false;
+if (isAndroid) {
+  mv.setAttribute("ar-modes", "webxr");   // اول داخل Chrome؛ جایگزین: لینک Scene Viewer
+  if (navigator.xr && navigator.xr.isSessionSupported) {
+    navigator.xr.isSessionSupported("immersive-ar").then(ok => { xrOK = ok; }).catch(() => {});
+  }
+} else if (isIOS) {
+  mv.setAttribute("ar-modes", "quick-look");
+}
+// هر پلتفرم فقط دکمه‌ی خودش را می‌بیند (روی کامپیوتر هر دو)
+if (isAndroid) $("arIOS").hidden = true;
+if (isIOS) $("arAndroid").hidden = true;
+
+function openSheet() {
+  const d = DESIGNS[index];
+  $("sheetTitle").textContent = d.name;
+  $("bar").style.width = "0";
+  const has3d = !!d.glb;
+  mv.hidden = !has3d;
+  $("sheetFoot").hidden = !has3d;
+  $("no3d").classList.toggle("show", !has3d);
+  if (has3d) {
+    const MV = customElements.get("model-viewer");
+    if (MV) MV.dracoDecoderLocation = new URL("draco/", location.href).href;   // دیکودر محلی (آفلاین)
+    mv.src = d.glb;
+    if (d.usdz) mv.setAttribute("ios-src", d.usdz);
+
+    // اندروید: جایگزین = Scene Viewer با اندازه‌ی ثابت (نیاز به اینترنت)
+    const fallback = encodeURIComponent(location.href);
+    $("arAndroid").href =
+      "intent://arvr.google.com/scene-viewer/1.0?file=" + encodeURIComponent(abs(d.glb)) +
+      "&mode=ar_only&resizable=false&title=" + encodeURIComponent(d.name) +
+      "#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;" +
+      "S.browser_fallback_url=" + fallback + ";end;";
+
+    // آیفون: Quick Look با مقیاس ثابت
+    $("arIOS").href = d.usdz + "#allowsContentScaling=0";
+  }
+  sheet.classList.add("open");
+  sheet.setAttribute("aria-hidden", "false");
+}
+function closeSheet() {
+  sheet.classList.remove("open");
+  sheet.setAttribute("aria-hidden", "true");
+  startCam();
+}
+$("open3d").onclick = openSheet;
+$("closeSheet").onclick = closeSheet;
+mv.addEventListener("progress", e => { $("bar").style.width = (e.detail.totalProgress * 100) + "%"; });
+
+// اندروید: اگر WebXR پشتیبانی شود، AR داخل Chrome (آفلاین)؛ وگرنه لینک Scene Viewer
+$("arAndroid").addEventListener("click", e => {
+  if (xrOK && mv.canActivateAR) {
+    e.preventDefault();
+    stopCam();
+    try { mv.activateAR(); } catch (err) { location.href = $("arAndroid").href; }
+  }
+});
+
+// قبل از رفتن به AR باید دوربین صفحه آزاد شود تا با دوربین AR تداخل نکند
+["arAndroid", "arIOS"].forEach(id => $(id).addEventListener("click", stopCam));
+
+// بعد از برگشت از AR دوربین دوباره روشن شود
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !sheet.classList.contains("open")) startCam();
+});
+window.addEventListener("pageshow", () => { if (!sheet.classList.contains("open")) startCam(); });
+
+/* ---------- نسخه‌ی آفلاین (PWA) ---------- */
+let deferred = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferred = e; $("inst").hidden = false; });
+$("inst").onclick = () => { if (!deferred) return; deferred.prompt(); deferred.userChoice.then(() => { deferred = null; $("inst").hidden = true; }); };
+function markReady() { $("pill").textContent = "✓ آفلاین آماده است"; $("pill").classList.add("ok"); }
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js")
+    .then(() => navigator.serviceWorker.ready)
+    .then(() => caches.keys())
+    .then(k => { if (k.length) markReady(); })
+    .catch(() => {});
+  navigator.serviceWorker.addEventListener("message", e => { if (e.data === "cached") markReady(); });
+}
+
+render();
+startCam();
+</script>
+</body>
+</html>
