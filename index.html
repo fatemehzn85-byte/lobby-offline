@@ -98,6 +98,14 @@
   model-viewer[hidden], .sheet-foot[hidden] { display: none !important; }
   #no3d.show { display:flex; }
   .ar[hidden] { display:none; }
+
+  #prep{position:fixed;top:calc(env(safe-area-inset-top,0px) + 56px);left:12px;right:12px;z-index:60;display:none;padding:.8rem 1rem;border:1px solid var(--line);border-radius:14px;background:rgba(20,22,26,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--text,#f1f1ee);font-size:.8rem;line-height:1.9}
+  #prep.show{display:block}
+  #prep b{display:block;font-size:.88rem;margin-bottom:.2rem}
+  #prep .pbar{height:3px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:.4rem}
+  #prep .pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+  #prep .dg{opacity:.65;font-size:.7rem;margin-top:.3rem}
+  #prep .x{position:absolute;top:.4rem;left:.6rem;background:none;border:0;color:inherit;font-size:1rem}
   @media (prefers-reduced-motion: reduce) {
     #overlay, #sheet.open, .dots button { transition: none; animation: none; }
   }
@@ -119,6 +127,8 @@
   <h1>طرح‌های لابی</h1>
   <span class="right"><span class="pill" id="pill"></span><button id="inst" hidden>نصب برنامه</button><span class="count" id="count"></span></span>
 </header>
+
+<div id="prep"><button class="x" id="prepx" aria-label="بستن">✕</button><b id="preptitle">آماده‌سازی آفلاین</b><div id="prepmsg"></div><div class="pbar"><i id="prepbar"></i></div><div id="ioshint" style="display:none;margin-top:.3rem">برای نصب روی آیفون/آیپد: در Safari دکمه‌ی Share را بزنید و Add to Home Screen را انتخاب کنید.</div><div class="dg" id="prepdiag"></div></div>
 
 <section class="bottom">
   <div class="name" id="name"></div>
@@ -303,18 +313,45 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pageshow", () => { if (!sheet.classList.contains("open")) startCam(); });
 
 /* ---------- نسخه‌ی آفلاین (PWA) ---------- */
+const CACHE_NAME = "lobby-ar-v3";
+const OFFLINE_ASSETS = ["01.png", "02.png", "03.png", "04.png", "03.glb", "03.usdz"];
+const absu = u => new URL(u, location.href).href;
+const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const STANDALONE = navigator.standalone || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+let swState = "در حال نصب", savedN = 0, lastErr = "", readyOK = false;
 let deferred = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferred = e; $("inst").hidden = false; });
 $("inst").onclick = () => { if (!deferred) return; deferred.prompt(); deferred.userChoice.then(() => { deferred = null; $("inst").hidden = true; }); };
-function markReady() { $("pill").textContent = "✓ آفلاین آماده است"; $("pill").classList.add("ok"); }
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js")
-    .then(() => navigator.serviceWorker.ready)
-    .then(() => caches.keys())
-    .then(k => { if (k.length) markReady(); })
-    .catch(() => {});
-  navigator.serviceWorker.addEventListener("message", e => { if (e.data === "cached") markReady(); });
+$("prepx").onclick = () => $("prep").classList.remove("show");
+function diag() { $("prepdiag").textContent = "وضعیت: " + swState + " · فایل‌های ذخیره‌شده: " + savedN + " از " + OFFLINE_ASSETS.length + (lastErr ? " · " + lastErr : ""); }
+function markReady() {
+  readyOK = true; $("pill").textContent = "✓ آفلاین آماده است"; $("pill").classList.add("ok");
+  if (IS_IOS && !STANDALONE) { $("preptitle").textContent = "آفلاین آماده است ✓"; $("prepmsg").textContent = ""; $("prepbar").parentNode.style.display = "none"; $("ioshint").style.display = "block"; $("prep").classList.add("show"); }
+  else $("prep").classList.remove("show");
 }
+async function countCached() { const c = await caches.open(CACHE_NAME); let n = 0; for (const u of OFFLINE_ASSETS) if (await c.match(absu(u))) n++; return n; }
+async function cacheAssets() {
+  const c = await caches.open(CACHE_NAME); let done = 0;
+  for (const u of OFFLINE_ASSETS) {
+    try { const url = absu(u); if (!(await c.match(url))) { const r = await fetch(url, { cache: "no-store" }); if (r.ok) await c.put(url, r); else lastErr = "خطا " + r.status; } }
+    catch (e) { lastErr = "خطای شبکه"; }
+    done++; $("prepbar").style.width = (done / OFFLINE_ASSETS.length * 100) + "%";
+    $("prepmsg").textContent = "در حال ذخیره‌ی فایل‌ها: " + done + " از " + OFFLINE_ASSETS.length + " — صفحه را نبندید و اینترنت را قطع نکنید";
+  }
+}
+async function prepareOffline() {
+  savedN = await countCached(); diag();
+  if (savedN >= OFFLINE_ASSETS.length) { markReady(); return; }
+  $("prep").classList.add("show");
+  await cacheAssets(); savedN = await countCached(); diag();
+  if (savedN >= OFFLINE_ASSETS.length) markReady();
+  else $("prepmsg").textContent = "بعضی فایل‌ها ذخیره نشدند؛ صفحه را دوباره باز کنید (با اینترنت).";
+}
+if ("serviceWorker" in navigator && window.caches) {
+  diag();
+  navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).then(() => { swState = "فعال ✓"; return prepareOffline(); })
+    .catch(e => { swState = "خطا"; lastErr = String(e && e.message || e).slice(0, 60); diag(); $("prep").classList.add("show"); });
+} else { swState = "این مرورگر آفلاین را پشتیبانی نمی‌کند (حالت Private؟)"; diag(); $("prep").classList.add("show"); }
 
 render();
 startCam();
